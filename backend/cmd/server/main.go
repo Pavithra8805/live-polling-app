@@ -14,9 +14,11 @@ import (
 	"live-polling-app/backend/internal/handlers"
 	"live-polling-app/backend/internal/middleware"
 	"live-polling-app/backend/internal/repository"
+	"live-polling-app/backend/internal/realtime"
 	"live-polling-app/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
@@ -50,6 +52,19 @@ func main() {
 	cancel()
 
 	database := mongoClient.Database(cfg.MongoDatabase)
+	redisOptions, err := redis.ParseURL(cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("parse Redis URL: %v", err)
+	}
+	redisClient := redis.NewClient(redisOptions)
+	defer redisClient.Close()
+	redisCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	if err := redisClient.Ping(redisCtx).Err(); err != nil {
+		cancel()
+		log.Fatalf("ping Redis: %v", err)
+	}
+	cancel()
+
 	userRepository := repository.NewUserRepository(database)
 	indexCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	pollRepository := repository.NewPollRepository(database)
@@ -66,6 +81,15 @@ func main() {
 	authService := service.NewAuthService(userRepository, cfg.JWTSecret, cfg.JWTIssuer, cfg.JWTExpiry)
 	authHandler := handlers.NewAuthHandler(authService)
 	pollHandler := handlers.NewPollHandler(service.NewPollService(pollRepository))
+	redisStore := realtime.NewRedisStore(redisClient)
+	hub := realtime.NewHub()
+	realtimeHandler := handlers.NewRealtimeHandler(service.NewVoteService(pollRepository, redisStore), hub, cfg.CookieSecure)
+	go func() {
+		if err := realtime.NewSubscriber(redisStore, hub).Run(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("Redis subscriber stopped: %v", err)
+			stop()
+		}
+	}()
 
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery(), middleware.SecurityHeaders(), middleware.CORS(cfg.AllowedOrigins), middleware.RequestBodyLimit(cfg.MaxBodyBytes))
@@ -80,6 +104,9 @@ func main() {
 	protected.PATCH("/:slug/close", pollHandler.Close)
 	protected.DELETE("/:slug", pollHandler.Delete)
 	router.GET("/api/polls/:slug", pollHandler.GetPublic)
+	router.GET("/api/polls/:slug/results", realtimeHandler.GetResults)
+	router.POST("/api/polls/:slug/vote", realtimeHandler.Vote)
+	router.GET("/api/polls/:slug/stream", realtimeHandler.Stream)
 
 	server := &http.Server{Addr: cfg.HTTPAddr, Handler: router}
 	go func() {

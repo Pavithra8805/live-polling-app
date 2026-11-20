@@ -101,6 +101,47 @@ func (r *PollRepository) Delete(ctx context.Context, slug string, ownerID bson.O
 	return nil
 }
 
+func (r *PollRepository) CreateVote(ctx context.Context, vote models.Vote) error {
+	_, err := r.votes.InsertOne(ctx, vote)
+	if isDuplicateKey(err) {
+		return ErrVoteAlreadyExists
+	}
+	return err
+}
+
+func (r *PollRepository) FindVoteCounts(ctx context.Context, pollID bson.ObjectID) (map[string]int64, error) {
+	cursor, err := r.votes.Aggregate(ctx, bson.A{
+		bson.D{{Key: "$match", Value: bson.D{{Key: "pollId", Value: pollID}}}},
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$optionId"},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+		}}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	type countRow struct {
+		ID    string `bson:"_id"`
+		Count int64  `bson:"count"`
+	}
+	counts := make(map[string]int64)
+	for cursor.Next(ctx) {
+		var row countRow
+		if err := cursor.Decode(&row); err != nil {
+			return nil, err
+		}
+		counts[row.ID] = row.Count
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return counts, nil
+}
+
+var ErrVoteAlreadyExists = errors.New("vote already exists")
+
 func isDuplicateKey(err error) bool {
 	var writeErr mongo.WriteException
 	return errors.As(err, &writeErr) && writeErr.HasErrorCode(11000)
