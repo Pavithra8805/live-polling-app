@@ -32,6 +32,9 @@ export function useLiveResults(slug) {
           counts: update.counts ? update.counts : current.counts,
           total: update.total ?? current.total,
         } : update)
+        if (update.counts) {
+          loadFullResults()
+        }
         setStatus('live')
         setError('')
       } catch {

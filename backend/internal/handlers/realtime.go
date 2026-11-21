@@ -114,9 +114,10 @@ func (h *RealtimeHandler) Stream(c *gin.Context) {
 			}
 			writer.Flush()
 		case <-heartbeat.C:
-			if count, heartbeatErr := h.redis.HeartbeatViewer(c.Request.Context(), pollID, viewerID); heartbeatErr == nil {
-				heartbeatResults := results
-				heartbeatResults.ViewerCount = count
+			if heartbeatResults, heartbeatErr := h.votes.Results(c.Request.Context(), c.Param("slug")); heartbeatErr == nil {
+				if count, viewerErr := h.redis.HeartbeatViewer(c.Request.Context(), pollID, viewerID); viewerErr == nil {
+					heartbeatResults.ViewerCount = count
+				}
 				if payload, marshalErr := marshalJSON(heartbeatResults); marshalErr == nil {
 					_, _ = fmt.Fprintf(writer, "event: results\ndata: %s\n\n", payload)
 				}

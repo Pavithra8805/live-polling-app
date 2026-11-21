@@ -73,7 +73,11 @@ func (s *VoteService) Vote(ctx context.Context, slug, optionID, voterID string) 
 		}
 		return PollResults{}, err
 	}
-	return buildResults(poll, redisResult.Counts), nil
+	results := buildResults(poll, redisResult.Counts)
+	if err := s.redis.Publish(ctx, poll.ID.Hex(), results); err != nil {
+		return PollResults{}, err
+	}
+	return results, nil
 }
 
 func (s *VoteService) counts(ctx context.Context, poll models.Poll) (map[string]int64, error) {
