@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"live-polling-app/backend/internal/httpx"
+	"live-polling-app/backend/internal/realtime"
 	"live-polling-app/backend/internal/repository"
 	"live-polling-app/backend/internal/service"
 
@@ -16,6 +17,7 @@ import (
 
 type PollHandler struct {
 	polls *service.PollService
+	redis *realtime.RedisStore
 }
 
 type createPollRequest struct {
@@ -25,8 +27,8 @@ type createPollRequest struct {
 	ClosesAt *time.Time `json:"closesAt"`
 }
 
-func NewPollHandler(polls *service.PollService) *PollHandler {
-	return &PollHandler{polls: polls}
+func NewPollHandler(polls *service.PollService, redisStore *realtime.RedisStore) *PollHandler {
+	return &PollHandler{polls: polls, redis: redisStore}
 }
 
 func (h *PollHandler) Create(c *gin.Context) {
@@ -105,6 +107,14 @@ func (h *PollHandler) manage(c *gin.Context, deletePoll bool) {
 	if deletePoll {
 		c.Status(http.StatusNoContent)
 		return
+	}
+	if h.redis != nil {
+		poll, findErr := h.polls.PublicBySlug(c.Request.Context(), c.Param("slug"))
+		if findErr == nil {
+			_ = h.redis.Publish(c.Request.Context(), poll.ID.Hex(), gin.H{
+				"poll": gin.H{"status": "closed"},
+			})
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "closed"})
 }

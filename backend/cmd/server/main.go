@@ -80,10 +80,10 @@ func main() {
 
 	authService := service.NewAuthService(userRepository, cfg.JWTSecret, cfg.JWTIssuer, cfg.JWTExpiry)
 	authHandler := handlers.NewAuthHandler(authService)
-	pollHandler := handlers.NewPollHandler(service.NewPollService(pollRepository))
 	redisStore := realtime.NewRedisStore(redisClient)
+	pollHandler := handlers.NewPollHandler(service.NewPollService(pollRepository), redisStore)
 	hub := realtime.NewHub()
-	realtimeHandler := handlers.NewRealtimeHandler(service.NewVoteService(pollRepository, redisStore), hub, cfg.CookieSecure)
+	realtimeHandler := handlers.NewRealtimeHandler(service.NewVoteService(pollRepository, redisStore), hub, redisStore, cfg.CookieSecure)
 	go func() {
 		if err := realtime.NewSubscriber(redisStore, hub).Run(ctx); err != nil && ctx.Err() == nil {
 			log.Printf("Redis subscriber stopped: %v", err)
@@ -96,8 +96,8 @@ func main() {
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	router.POST("/api/auth/signup", authHandler.Signup)
-	router.POST("/api/auth/login", authHandler.Login)
+	router.POST("/api/auth/signup", middleware.RedisRateLimit(redisClient, 10, time.Minute, "signup"), authHandler.Signup)
+	router.POST("/api/auth/login", middleware.RedisRateLimit(redisClient, 10, time.Minute, "login"), authHandler.Login)
 	protected := router.Group("/api/polls", middleware.RequireAuth(authService))
 	protected.POST("", pollHandler.Create)
 	protected.GET("/mine", pollHandler.ListMine)
@@ -105,7 +105,7 @@ func main() {
 	protected.DELETE("/:slug", pollHandler.Delete)
 	router.GET("/api/polls/:slug", pollHandler.GetPublic)
 	router.GET("/api/polls/:slug/results", realtimeHandler.GetResults)
-	router.POST("/api/polls/:slug/vote", realtimeHandler.Vote)
+	router.POST("/api/polls/:slug/vote", middleware.RedisRateLimit(redisClient, 30, time.Minute, "vote"), realtimeHandler.Vote)
 	router.GET("/api/polls/:slug/stream", realtimeHandler.Stream)
 
 	server := &http.Server{Addr: cfg.HTTPAddr, Handler: router}

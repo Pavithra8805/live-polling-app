@@ -94,6 +94,35 @@ func TestConcurrentVotesHaveExactCounts(t *testing.T) {
 	}
 }
 
+func TestViewerPresenceJoinLeaveAndHeartbeat(t *testing.T) {
+	_, store := newTestRedis(t)
+	ctx := context.Background()
+
+	count, err := store.JoinViewer(ctx, "poll-presence", "viewer-a")
+	if err != nil {
+		t.Fatalf("JoinViewer() error = %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("JoinViewer() count = %d", count)
+	}
+
+	count, err = store.HeartbeatViewer(ctx, "poll-presence", "viewer-a")
+	if err != nil {
+		t.Fatalf("HeartbeatViewer() error = %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("HeartbeatViewer() count = %d", count)
+	}
+
+	count, err = store.LeaveViewer(ctx, "poll-presence", "viewer-a")
+	if err != nil {
+		t.Fatalf("LeaveViewer() error = %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("LeaveViewer() count = %d", count)
+	}
+}
+
 func itoa(value int) string {
 	const digits = "0123456789"
 	if value == 0 {

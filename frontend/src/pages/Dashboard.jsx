@@ -8,6 +8,7 @@ export default function Dashboard() {
   const [polls, setPolls] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
   const navigate = useNavigate()
 
   const load = async () => {
@@ -38,8 +39,14 @@ export default function Dashboard() {
   }, [])
 
   const closePoll = async (slug) => {
-    await api.closePoll(slug)
-    load()
+    try {
+      await api.closePoll(slug)
+      setToast('Poll closed')
+      setTimeout(() => setToast(''), 2200)
+      load()
+    } catch (closeError) {
+      setError(closeError.message)
+    }
   }
 
   const deletePoll = async (slug) => {
@@ -51,6 +58,7 @@ export default function Dashboard() {
   if (loading) return <Loading label="Loading your polls" />
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      {toast && <div role="status" className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-xl dark:bg-white dark:text-slate-900">{toast}</div>}
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-sm font-bold uppercase tracking-wider text-indigo-600">My polls</p>

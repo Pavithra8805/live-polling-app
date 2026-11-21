@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -22,6 +23,7 @@ const voterCookie = "voter_id"
 type RealtimeHandler struct {
 	votes        *service.VoteService
 	hub          *realtime.Hub
+	redis        *realtime.RedisStore
 	cookieSecure bool
 }
 
@@ -29,8 +31,8 @@ type voteRequest struct {
 	OptionID string `json:"optionId"`
 }
 
-func NewRealtimeHandler(votes *service.VoteService, hub *realtime.Hub, cookieSecure bool) *RealtimeHandler {
-	return &RealtimeHandler{votes: votes, hub: hub, cookieSecure: cookieSecure}
+func NewRealtimeHandler(votes *service.VoteService, hub *realtime.Hub, redisStore *realtime.RedisStore, cookieSecure bool) *RealtimeHandler {
+	return &RealtimeHandler{votes: votes, hub: hub, redis: redisStore, cookieSecure: cookieSecure}
 }
 
 func (h *RealtimeHandler) GetResults(c *gin.Context) {
@@ -68,8 +70,18 @@ func (h *RealtimeHandler) Stream(c *gin.Context) {
 		return
 	}
 	pollID := results.Poll.ID.Hex()
+	viewerID := randomViewerConnectionID()
+	viewerCount, err := h.redis.JoinViewer(c.Request.Context(), pollID, viewerID)
+	if err != nil {
+		viewerCount = 0
+	} else {
+		results.ViewerCount = viewerCount
+	}
 	client := h.hub.Register(pollID)
-	defer h.hub.Unregister(pollID, client)
+	defer func() {
+		h.hub.Unregister(pollID, client)
+		_, _ = h.redis.LeaveViewer(context.Background(), pollID, viewerID)
+	}()
 
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
@@ -102,6 +114,13 @@ func (h *RealtimeHandler) Stream(c *gin.Context) {
 			}
 			writer.Flush()
 		case <-heartbeat.C:
+			if count, heartbeatErr := h.redis.HeartbeatViewer(c.Request.Context(), pollID, viewerID); heartbeatErr == nil {
+				heartbeatResults := results
+				heartbeatResults.ViewerCount = count
+				if payload, marshalErr := marshalJSON(heartbeatResults); marshalErr == nil {
+					_, _ = fmt.Fprintf(writer, "event: results\ndata: %s\n\n", payload)
+				}
+			}
 			if _, err := fmt.Fprint(writer, ": heartbeat\n\n"); err != nil {
 				return
 			}
@@ -156,4 +175,12 @@ func marshalJSON(value interface{}) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func randomViewerConnectionID() string {
+	buffer := make([]byte, 16)
+	if _, err := rand.Read(buffer); err != nil {
+		return hex.EncodeToString([]byte(time.Now().String()))
+	}
+	return hex.EncodeToString(buffer)
 }

@@ -20,9 +20,10 @@ type VoteService struct {
 }
 
 type PollResults struct {
-	Poll   models.Poll      `json:"poll"`
-	Counts map[string]int64 `json:"counts"`
-	Total  int64            `json:"total"`
+	Poll        models.Poll      `json:"poll"`
+	Counts      map[string]int64 `json:"counts"`
+	Total       int64            `json:"total"`
+	ViewerCount int64            `json:"viewerCount"`
 }
 
 func NewVoteService(polls *repository.PollRepository, redis *realtime.RedisStore) *VoteService {

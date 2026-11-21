@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -96,6 +97,66 @@ func (r *RedisStore) SetCounts(ctx context.Context, pollID string, counts map[st
 	return err
 }
 
+func (r *RedisStore) JoinViewer(ctx context.Context, pollID, viewerID string) (int64, error) {
+	now := float64(time.Now().UnixMilli())
+	key := viewersPresenceKey(pollID)
+	pipe := r.client.TxPipeline()
+	pipe.ZRemRangeByScore(ctx, key, "-inf", strconv.FormatFloat(now-60_000, 'f', -1, 64))
+	pipe.ZAdd(ctx, key, redis.Z{Score: now + 60_000, Member: viewerID})
+	pipe.ZCount(ctx, key, strconv.FormatFloat(now, 'f', -1, 64), "+inf")
+	results, err := pipe.Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	count, ok := results[len(results)-1].(*redis.IntCmd)
+	if !ok {
+		return 0, errors.New("unexpected viewer count result")
+	}
+	return count.Val(), nil
+}
+
+func (r *RedisStore) HeartbeatViewer(ctx context.Context, pollID, viewerID string) (int64, error) {
+	now := float64(time.Now().UnixMilli())
+	key := viewersPresenceKey(pollID)
+	pipe := r.client.TxPipeline()
+	pipe.ZRemRangeByScore(ctx, key, "-inf", strconv.FormatFloat(now-60_000, 'f', -1, 64))
+	pipe.ZAdd(ctx, key, redis.Z{Score: now + 60_000, Member: viewerID})
+	pipe.ZCount(ctx, key, strconv.FormatFloat(now, 'f', -1, 64), "+inf")
+	results, err := pipe.Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	count, ok := results[len(results)-1].(*redis.IntCmd)
+	if !ok {
+		return 0, errors.New("unexpected viewer count result")
+	}
+	return count.Val(), nil
+}
+
+func (r *RedisStore) LeaveViewer(ctx context.Context, pollID, viewerID string) (int64, error) {
+	key := viewersPresenceKey(pollID)
+	pipe := r.client.TxPipeline()
+	pipe.ZRem(ctx, key, viewerID)
+	pipe.ZCard(ctx, key)
+	results, err := pipe.Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	count, ok := results[len(results)-1].(*redis.IntCmd)
+	if !ok {
+		return 0, errors.New("unexpected viewer count result")
+	}
+	return count.Val(), nil
+}
+
+func (r *RedisStore) Publish(ctx context.Context, pollID string, payload any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return r.client.Publish(ctx, updatesChannel(pollID), data).Err()
+}
+
 func (r *RedisStore) Subscribe(ctx context.Context) *redis.PubSub {
 	return r.client.PSubscribe(ctx, "poll:*:updates")
 }
@@ -110,6 +171,10 @@ func votersKey(pollID string) string {
 
 func updatesChannel(pollID string) string {
 	return "poll:" + pollID + ":updates"
+}
+
+func viewersPresenceKey(pollID string) string {
+	return "poll:" + pollID + ":viewers"
 }
 
 var voteScript = redis.NewScript(`

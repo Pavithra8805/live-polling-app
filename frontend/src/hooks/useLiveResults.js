@@ -3,7 +3,7 @@ import { api, streamUrl } from '../api/client'
 
 export function useLiveResults(slug) {
   const [results, setResults] = useState(null)
-  const [status, setStatus] = useState('reconnecting')
+  const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
   const sourceRef = useRef(null)
 
@@ -24,7 +24,14 @@ export function useLiveResults(slug) {
     sourceRef.current = new EventSource(streamUrl(slug), { withCredentials: true })
     sourceRef.current.addEventListener('results', (event) => {
       try {
-        setResults(JSON.parse(event.data))
+        const update = JSON.parse(event.data)
+        setResults((current) => current ? {
+          ...current,
+          ...update,
+          poll: update.poll ? { ...current.poll, ...update.poll } : current.poll,
+          counts: update.counts ? update.counts : current.counts,
+          total: update.total ?? current.total,
+        } : update)
         setStatus('live')
         setError('')
       } catch {
