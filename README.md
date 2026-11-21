@@ -124,3 +124,16 @@ Post-deploy test:
 - Close or expire the connection and confirm reconnection loads full results.
 - Confirm duplicate voting is rejected.
 - Confirm close/delete require authentication.
+
+## AI usage
+
+AI tools were used as pair-programming assistance for repository scaffolding, dependency research, code review, test generation, Docker configuration, documentation, and repeated verification. Human review was still required for architecture and behavior decisions. Any interview answer should name the tools actually used in this session and describe both where they accelerated work and where verification was necessary.
+
+## Known limitations
+
+- A random `httpOnly` voter cookie is convenient but not strong identity verification.
+- Redis counter and voter state can be rebuilt or rechecked against MongoDB, but a Redis outage will prevent accepted live voting.
+- Pub/Sub fan-out is instance-local through the hub and Redis subscriber; deployment must expose sticky SSE-independent HTTP routing.
+- The test suite does not currently start MongoDB or prove a full browser E2E flow in CI.
+- Docker local startup requires Docker Desktop's overlay filesystem to be writable.
+- Public deployment, provider credentials, the public URL, and the demo video are not included until they are created and verified.
