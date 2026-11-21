@@ -3,8 +3,6 @@ package realtime
 import (
 	"context"
 	"strings"
-
-	"github.com/redis/go-redis/v9"
 )
 
 type Subscriber struct {

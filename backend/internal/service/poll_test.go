@@ -19,11 +19,12 @@ func TestValidateCreatePollRejectsDuplicateOptions(t *testing.T) {
 }
 
 func TestValidateCreatePollTrimsOptionsAndAssignsStableIDs(t *testing.T) {
+	closesAt := time.Now().Add(time.Hour)
 	_, _, options, err := validateCreatePoll(CreatePollInput{
 		Slug:     "team-lunch",
 		Question: "Where should we eat?",
 		Options:  []string{" Pizza ", "Sushi"},
-		ClosesAt: time.Now().Add(time.Hour),
+		ClosesAt: &closesAt,
 	})
 	if err != nil {
 		t.Fatalf("validateCreatePoll() error = %v", err)
