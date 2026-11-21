@@ -13,8 +13,8 @@ import (
 	"live-polling-app/backend/internal/config"
 	"live-polling-app/backend/internal/handlers"
 	"live-polling-app/backend/internal/middleware"
-	"live-polling-app/backend/internal/repository"
 	"live-polling-app/backend/internal/realtime"
+	"live-polling-app/backend/internal/repository"
 	"live-polling-app/backend/internal/service"
 
 	"github.com/gin-gonic/gin"

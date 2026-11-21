@@ -20,8 +20,8 @@ import (
 const voterCookie = "voter_id"
 
 type RealtimeHandler struct {
-	votes       *service.VoteService
-	hub         *realtime.Hub
+	votes        *service.VoteService
+	hub          *realtime.Hub
 	cookieSecure bool
 }
 

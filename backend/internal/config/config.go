@@ -9,17 +9,17 @@ import (
 )
 
 type Config struct {
-	HTTPAddr          string
-	MongoURI          string
-	MongoDatabase     string
-	RedisURL          string
-	JWTSecret         string
-	JWTIssuer         string
-	JWTExpiry         time.Duration
-	AllowedOrigins    []string
-	CookieSecure      bool
-	MaxBodyBytes      int64
-	ShutdownTimeout   time.Duration
+	HTTPAddr        string
+	MongoURI        string
+	MongoDatabase   string
+	RedisURL        string
+	JWTSecret       string
+	JWTIssuer       string
+	JWTExpiry       time.Duration
+	AllowedOrigins  []string
+	CookieSecure    bool
+	MaxBodyBytes    int64
+	ShutdownTimeout time.Duration
 }
 
 func Load() (Config, error) {
