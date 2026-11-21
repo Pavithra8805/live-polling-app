@@ -23,3 +23,13 @@
 - **Failure:** During local UI verification, the shared browser session was not signed in as the poll owner, so the Dashboard Close button could not be used directly.
 - **Cause:** The browser session did not retain the owner's JWT after the earlier login flow.
 - **Fix:** Verify the real close endpoint using a short-lived JWT signed with the local JWT secret for the poll owner ID. MongoDB and the API both confirmed `status: closed`; the final tie at 3 votes each is handled as a tied winner set rather than selecting only the first option.
+
+## Public deployment and browser CORS
+
+- **Frontend:** Deployed to Vercel at https://live-polling-app-orcin.vercel.app.
+- **Backend:** Deployed to Render at https://live-polling-app-lwmq.onrender.com.
+- **Database:** MongoDB Atlas free cluster `Live Polling App` with the `LivePollCluster` deployment.
+- **Realtime:** Redis Cloud free database `live-polling-redis`.
+- **Failure:** Browser signup showed `Failed to fetch` because the backend preflight rejected the Vercel origin when `ALLOWED_ORIGINS` was missing or incorrect.
+- **Fix:** Set `ALLOWED_ORIGINS` to the exact Vercel origin, redeploy Render, and verify `OPTIONS` and `POST /api/auth/signup` return `Access-Control-Allow-Origin`.
+- **Verification:** Browser signup created an account and redirected to `/dashboard`; a poll named `team-outing-2026` was created and a Beach vote updated the public results to 1 total vote.

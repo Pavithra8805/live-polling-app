@@ -104,6 +104,14 @@ The backend includes miniredis duplicate-voter tests and a 200-voter concurrency
 
 ## Deployment
 
+**Verified public deployment**
+
+- Frontend: https://live-polling-app-orcin.vercel.app
+- Backend: https://live-polling-app-lwmq.onrender.com
+- Backend health: https://live-polling-app-lwmq.onrender.com/healthz
+- Database: MongoDB Atlas free cluster
+- Realtime: Redis Cloud database
+
 1. Create a MongoDB Atlas free cluster and database-user password.
 2. Create a Redis provider that supports Pub/Sub and persistence/reconnect behavior.
 3. Deploy the backend from `backend/` with Go 1.26 or `backend/Dockerfile`.
@@ -136,4 +144,4 @@ AI tools were used as pair-programming assistance for repository scaffolding, de
 - Pub/Sub fan-out is instance-local through the hub and Redis subscriber; deployment must expose sticky SSE-independent HTTP routing.
 - The test suite does not currently start MongoDB or prove a full browser E2E flow in CI.
 - Docker local startup requires Docker Desktop's overlay filesystem to be writable.
-- Public deployment, provider credentials, the public URL, and the demo video are not included until they are created and verified.
+- The free Render instance spins down with inactivity and may delay the first request.
